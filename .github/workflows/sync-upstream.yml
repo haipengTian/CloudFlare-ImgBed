@@ -24,7 +24,8 @@ jobs:
   sync_latest_from_upstream:
     name: Sync latest commits from upstream repo
     runs-on: ubuntu-latest
-    if: ${{ github.event.repository.fork }}
+    # 个人 Docker 版本通过 tools/custom/sync-upstream.sh 选择目标并验证。
+    if: ${{ github.event.repository.fork && github.repository != 'haipengTian/CloudFlare-ImgBed' }}
 
     steps:
       - name: Checkout target repo
