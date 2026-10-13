@@ -64,13 +64,25 @@ jobs:
           set -euo pipefail
           umask 077
           scratch=$(mktemp -d)
-          cleanup() { docker rm -f imgbed-smoke >/dev/null 2>&1 || true; rm -rf -- "$scratch"; }
+          cleanup() {
+            result=$?
+            if [[ $result != 0 ]]; then
+              docker inspect --format 'status={{.State.Status}} exit={{.State.ExitCode}} ports={{json .NetworkSettings.Ports}}' imgbed-smoke >&2 || true
+              docker logs --tail 80 imgbed-smoke >&2 || true
+            fi
+            docker rm -f imgbed-smoke >/dev/null 2>&1 || true
+            rm -rf -- "$scratch"
+            return "$result"
+          }
           trap cleanup EXIT
           export BASIC_USER=smoke_admin
           export BASIC_PASS AUTH_CODE AI_CONFIG_SECRET
           BASIC_PASS=$(openssl rand -hex 32)
           AUTH_CODE=$(openssl rand -hex 32)
           AI_CONFIG_SECRET=$(openssl rand -hex 32)
+          for secret in "$BASIC_PASS" "$AUTH_CODE" "$AI_CONFIG_SECRET"; do
+            echo "::add-mask::$secret"
+          done
           printf 'BASIC_USER=%s\nBASIC_PASS=%s\nAUTH_CODE=%s\nAI_CONFIG_SECRET=%s\n' "$BASIC_USER" "$BASIC_PASS" "$AUTH_CODE" "$AI_CONFIG_SECRET" > "$scratch/env"
           docker run -d --name imgbed-smoke --env-file "$scratch/env" --publish 127.0.0.1::8080 imgbed-smoke:local >/dev/null
           port=$(docker port imgbed-smoke 8080/tcp | cut -d: -f2)
@@ -88,7 +100,10 @@ jobs:
           docker exec imgbed-smoke node --import ./deploy/server/register.mjs --test tools/custom/tests/readiness.mjs
           docker exec imgbed-smoke node --import ./deploy/server/register.mjs deploy/server/readiness.js
           node tools/custom/tests/smoke.mjs "http://127.0.0.1:$port" "$scratch/file.json"
+          echo "Before restart: host port $port"
           docker restart imgbed-smoke >/dev/null
+          port=$(docker port imgbed-smoke 8080/tcp | cut -d: -f2)
+          echo "After restart: host port $port"
           ready
           node tools/custom/tests/smoke.mjs "http://127.0.0.1:$port" "$scratch/file.json" verify
       - uses: docker/login-action@v4
