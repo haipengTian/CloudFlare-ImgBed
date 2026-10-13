@@ -7,19 +7,25 @@
 
 ## 当前基线与分支
 
-2026-10-13 实际 fetch 核实：个人 origin/main、官方 upstream/main 均为
+2026-10-13 准备部署时实际 fetch 核实：个人 origin/main、官方 upstream/main 均为
 `0d219dd45f514265ba9cb17788059fd7a1b1240d`，package.json 版本 `2.7.7`。
-本次维护分支 `codex/imgbed-self-hosting` 从该个人远端基线创建；原本地 main 留在
-`07fe2501b4ba0e3c6bc59c6317405413cef356e8`，未重置、未合并 main。
-该维护分支含从旧 main 到当前基线的112个上游提交，合入时应核对范围。
-官方已配置为 upstream。本次未推送、未创建 tag、未发布镜像、未部署服务器。
+初始维护分支 `codex/imgbed-self-hosting` 从该个人远端基线创建。
+发布记录复核时，本地 main 为 `0d219dd45f514265ba9cb17788059fd7a1b1240d`；
+后续发布与文档维护在独立 `codex/` 分支进行。
+个人部署基础已通过 [PR #1](https://github.com/haipengTian/CloudFlare-ImgBed/pull/1) 合入远端 main，
+容器重启检查修复已通过 [PR #2](https://github.com/haipengTian/CloudFlare-ImgBed/pull/2) 合入。
+官方已配置为 upstream；服务器尚未部署。
+
+首版 `v2.7.7-custom.1` 已发布：
+`ghcr.io/haipengtian/cloudflare-imgbed:2.7.7-custom.1`，公开可拉取，支持 linux/amd64 和 linux/arm64。
+源提交、镜像摘要、工作流及验收边界见 [首版发布记录](releases/v2.7.7-custom.1.md)。
 
 ## 上游同步
 
-本维护分支中的原定时主分支同步和 Worker 自动部署会跳过个人仓库，合入并推送后生效。
+原定时主分支同步和 Worker 自动部署已在个人仓库跳过。
 原 workflow 在其他 Fork 的行为保留，个人仓库 guard 是二开维护的重要改动，后续融合要保留。
 
-提交并审查本次维护分支、合入个人 main 后，在干净工作区选择明确的官方 tag 或完整提交 SHA：
+后续同步在干净工作区选择明确的官方 tag 或完整提交 SHA：
 
 ```bash
 git remote -v
@@ -80,7 +86,12 @@ Docker healthcheck 同时读取真实有效配置并验证实际管理员用户�
    再按 server-ops/imgbed/README.md 安装或升级。
 
 个人工作流通过 GITHUB_TOKEN 的 packages:write 发布，不需要提供额外 DockerHub Token。
-GitHub Actions 需已启用且仓库策略允许 Packages 写入；本次未现场执行线上工作流。
+GitHub Actions 需已启用且仓库策略允许 Packages 写入。
+首版源提交 `ac48b6233679a62ec217eb73b19c89857a841547` 的
+[手动容器验收](https://github.com/haipengTian/CloudFlare-ImgBed/actions/runs/38363801044) 已成功；
+实际日志记录重启前后随机宿主端口为 32768 和 32769，文件与认证持久化、删除检查通过。
+[首版 tag 发布工作流](https://github.com/haipengTian/CloudFlare-ImgBed/actions/runs/38364801354) 也已成功，
+GHCR 页面显示 Public，匿名 registry 请求确认镜像可读取。
 每次个人改动增加 custom 序号；同步到新官方版本时更换版本前缀。
 官方原 docker-publish 工作流仍只在官方仓库发布，避免误用官方 DockerHub 的发布配置。
 
