@@ -14,6 +14,8 @@ import { HuggingFaceAPI } from "../utils/storage/huggingfaceAPI";
 import { WebDAVAPI } from "../utils/storage/webdavAPI";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getDatabase } from '../utils/databaseAdapter.js';
+import { validateApiToken } from '../utils/auth/tokenValidator.js';
+import { preparePrivateUpload, uploadAccessMetadata, uploadAccessResponse } from './privateUpload.js';
 
 
 export async function onRequest(context) {  // Contents of context object
@@ -35,6 +37,10 @@ export async function onRequest(context) {  // Contents of context object
     if (!await userAuthCheck(env, url, request, requiredPermission)) {
         return UnauthorizedResponse('Unauthorized');
     }
+
+    const privateError = await preparePrivateUpload(context, async permission =>
+        (await validateApiToken(request, getDatabase(env), permission)).valid);
+    if (privateError) return privateError;
 
     // 获得上传IP
     const uploadIp = getUploadIp(request);
@@ -180,6 +186,7 @@ async function processFileUpload(context, formdata = null) {
         Directory: normalizedFolder === '' ? '' : normalizedFolder + '/',
         Tags: []
     };
+    Object.assign(metadata, uploadAccessMetadata(context));
 
     // 添加图片尺寸信息
     if (imageDimensions) {
@@ -190,7 +197,26 @@ async function processFileUpload(context, formdata = null) {
     const fileExt = resolveFileExt(fileName, fileType);
 
     // 构建文件ID
-    const fullId = await buildUniqueFileId(context, fileName, fileType);
+    let fullId;
+    if (context.privateUpload) {
+        // Cloudreve owns immutable physical paths. Never manufacture a second
+        // name when a delayed request is retried after its response was lost.
+        if (!/^[A-Za-z0-9_.-]+$/.test(fileName) || fileName.includes('..')) {
+            return createResponse('Private storage requires a safe physical filename', { status: 400 });
+        }
+        fullId = normalizedFolder ? `${normalizedFolder}/${fileName}` : fileName;
+        const existing = await getDatabase(context.env).getWithMetadata(fullId);
+        if (existing?.metadata) {
+            if (existing.metadata.Access === 'private' &&
+                existing.metadata.StorageUploadId === url.searchParams.get('storageUploadId') &&
+                existing.metadata.FileSizeBytes === fileSizeBytes) {
+                return buildUploadResponse(context, `/file/${fullId}`);
+            }
+            return createResponse('Private storage destination belongs to another upload', { status: 409 });
+        }
+    } else {
+        fullId = await buildUniqueFileId(context, fileName, fileType);
+    }
 
     // 获得返回链接格式, default为返回/file/id, full为返回完整链接
     const returnFormat = url.searchParams.get('returnFormat') || 'default';
@@ -209,7 +235,7 @@ async function processFileUpload(context, formdata = null) {
 
     /* ====================================不同渠道上传======================================= */
     // 出错是否切换渠道自动重试，默认开启
-    const autoRetry = url.searchParams.get('autoRetry') === 'false' ? false : true;
+    const autoRetry = context.privateUpload ? false : url.searchParams.get('autoRetry') !== 'false';
 
     let err = '';
     // 上传到不同渠道
@@ -274,7 +300,7 @@ async function processFileUpload(context, formdata = null) {
 
 // 构建上传成功响应，自动附带 publicUrl（如果已配置）
 function buildUploadResponse(context, returnLink) {
-    const result = { src: returnLink };
+    const result = { src: returnLink, ...uploadAccessResponse(context) };
     if (context.publicUrl) {
         result.publicUrl = context.publicUrl;
     }
@@ -322,7 +348,7 @@ async function uploadFileToCloudflareR2(context, fullId, metadata, returnLink) {
     // 图像审查，采用R2的publicUrl
     const R2PublicUrl = r2Channel.publicUrl;
     let moderateUrl = `${R2PublicUrl}/${fullId}`;
-    metadata.Label = await moderateContent(env, moderateUrl);
+    metadata.Label = context.privateUpload ? 'None' : await moderateContent(env, moderateUrl);
 
     // 写入数据库
     try {
@@ -399,7 +425,7 @@ async function uploadFileToS3(context, fullId, metadata, returnLink) {
         metadata.S3FileKey = s3FileName;
 
         // 图像审查
-        if (uploadModerate && uploadModerate.enabled) {
+        if (!context.privateUpload && uploadModerate && uploadModerate.enabled) {
             try {
                 await db.put(fullId, "", { metadata });
             } catch {
