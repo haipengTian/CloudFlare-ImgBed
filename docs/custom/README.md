@@ -16,6 +16,9 @@
 容器重启检查修复已通过 [PR #2](https://github.com/haipengTian/CloudFlare-ImgBed/pull/2) 合入。
 官方已配置为 upstream；服务器尚未部署。
 
+当前版本 **`v2.7.7-custom.2`** 已发布，新增默认关闭的 Cloudreve 私密存储接口：
+`ghcr.io/haipengtian/cloudflare-imgbed:2.7.7-custom.2`。镜像、工作流和验收边界见[发布记录](releases/v2.7.7-custom.2.md)。
+
 首版 `v2.7.7-custom.1` 已发布：
 `ghcr.io/haipengtian/cloudflare-imgbed:2.7.7-custom.1`，公开可拉取，支持 linux/amd64 和 linux/arm64。
 源提交、镜像摘要、工作流及验收边界见 [首版发布记录](releases/v2.7.7-custom.1.md)。
