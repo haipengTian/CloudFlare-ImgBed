@@ -1,5 +1,5 @@
 import { createS3Client } from '../utils/storage/s3Client.js';
-import { GetObjectCommand } from "@aws-sdk/client-s3";
+import { GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { fetchSecurityConfig } from "../utils/sysConfig";
 import { TelegramAPI } from "../utils/storage/telegramAPI";
 import { DiscordAPI } from "../utils/storage/discordAPI";
@@ -11,6 +11,8 @@ import {
 } from './fileTools';
 import { getDatabase } from '../utils/databaseAdapter.js';
 import { authenticate, AUTH_SCOPE } from '../utils/auth/authCore.js';
+import { validateApiToken } from '../utils/auth/tokenValidator.js';
+import { validateSession } from '../utils/auth/sessionManager.js';
 import {
     resolveDiscordCredentials,
     resolveHuggingFaceCredentials,
@@ -28,7 +30,18 @@ import {
 } from './imageTransform.js';
 
 
-export async function onRequest(context) {  // Contents of context object
+export async function onRequest(context) {
+    const response = await serveFile(context);
+    if (context.privateStorageUploadId && response.status >= 200 && response.status < 300) {
+        const headers = new Headers(response.headers);
+        headers.set('X-Imagebed-Upload-Id', context.privateStorageUploadId);
+        headers.set('Cache-Control', FILE_CACHE_CONTROL.NO_STORE);
+        return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+    }
+    return response;
+}
+
+async function serveFile(context) {  // Contents of context object
     const {
         request, // same as existing Worker API
         env, // same as existing Worker API
@@ -82,6 +95,14 @@ export async function onRequest(context) {  // Contents of context object
         imgRecord.metadata = {};
     }
 
+    // Private objects require an actual credential, even when global admin
+    // authentication is unconfigured (the legacy public/admin contract stays unchanged).
+    if (imgRecord.metadata.Access === 'private' && context.fileAccess.isAdminPreview) {
+        context.fileAccess.privateAuthorized =
+            (await validateApiToken(request, db, 'manage')).valid ||
+            (await validateSession(env, request, 'admin')).valid;
+    }
+
     const fileName = imgRecord.metadata?.FileName || fileId;
     const encodedFileName = encodeURIComponent(fileName);
     const fileType = imgRecord.metadata?.FileType || null;
@@ -90,6 +111,9 @@ export async function onRequest(context) {  // Contents of context object
     let accessRes = await returnWithCheck(context, imgRecord);
     if (accessRes.status !== 200) {
         return accessRes; // 如果不可访问，直接返回
+    }
+    if (imgRecord.metadata.Access === 'private') {
+        context.privateStorageUploadId = imgRecord.metadata.StorageUploadId;
     }
 
     const imageSourceValidation = validateImageTransformSource(context.imageTransform, env, fileType, fileName);
@@ -706,6 +730,7 @@ async function handleR2File(context, fileId, encodedFileName, fileType) {
         const headers = new Headers();
         object.writeHttpMetadata(headers);
         setCommonHeaders(headers, encodedFileName, fileType, getFileCacheControl(context));
+        headers.set('Content-Length', String(object.size));
 
         // 处理HEAD请求
         if (request.method === 'HEAD') {
@@ -738,7 +763,8 @@ async function handleS3File(context, metadata, encodedFileName, fileType) {
     const { Referer, url, request } = context;
 
     // 检查是否配置了 CDN 文件完整路径
-    const cdnFileUrl = await getS3CdnFileUrl(context.env, metadata);
+    // Private storage must use the authenticated bucket API, never a public CDN.
+    const cdnFileUrl = metadata.Access === 'private' ? '' : await getS3CdnFileUrl(context.env, metadata);
 
     // 如果配置了 CDN 文件路径，通过 CDN 读取文件
     if (cdnFileUrl) {
@@ -834,7 +860,7 @@ async function handleS3FileViaAPI(context, metadata, encodedFileName, fileType) 
             commandParams.Range = range;
         }
 
-        const command = new GetObjectCommand(commandParams);
+        const command = request.method === 'HEAD' ? new HeadObjectCommand(commandParams) : new GetObjectCommand(commandParams);
         const response = await s3Client.send(command);
 
         // 设置响应头

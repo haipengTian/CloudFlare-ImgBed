@@ -3,7 +3,7 @@
 个人仓库：`https://github.com/haipengTian/CloudFlare-ImgBed`；官方：`https://github.com/MarSeventh/CloudFlare-ImgBed`。
 部署配置在 `haipengTian/server-ops/imgbed/`，域名为 `img.thpvip.xyz`。
 产品仓库维护代码、检查与镜像；运维仓库维护服务器安装、HTTPS、备份和升级。
-本次仅准备部署与维护基础，没有新增业务二开功能。
+部署和升级沿用 GitHub Actions → GHCR 固定版本镜像 → 服务器 `update.sh`，不通过源码包部署。
 
 ## 当前基线与分支
 
@@ -100,4 +100,4 @@ GHCR 页面显示 Public，匿名 registry 请求确认镜像可读取。
 每项功能从已融合且可交付的个人 main 建立 `codex/feature-名称`，先写行为测试，再实现并记录回归。
 优先保留官方接口与配置结构，把功能改动按独立提交管理，避免混入无关格式整理。
 审查、验证、合入后沿用同一套个人版本发布与运维升级流程。
-暂时没有具体二开需求，保持产品功能不变。
+Cloudreve 存储适配新增可选[私密存储接口 v1](PRIVATE_STORAGE.md)：默认关闭，普通公开上传保持原行为。服务器显式允许非公开渠道后，Cloudreve 才能在独占目录进行私密上传、鉴权读取及幂等重试；首轮限定 `cloudreve-test/`。配套运维步骤见 `server-ops/imgbed/PRIVATE_STORAGE_UPGRADE.md`。

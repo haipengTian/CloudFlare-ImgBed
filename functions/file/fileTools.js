@@ -159,6 +159,11 @@ export async function returnWithCheck(context, imgRecord) {
         return unauthorizedAdminPreviewResponse();
     }
 
+    if (imgRecord.metadata?.Access === 'private' && !(isAdminPreview && adminAuthorized && context.fileAccess.privateAuthorized === true)) {
+        context.fileAccess.cacheControl = FILE_CACHE_CONTROL.NO_STORE;
+        return unauthorizedAdminPreviewResponse();
+    }
+
     const record = imgRecord;
     if (record.metadata === null) {
         context.fileAccess.cacheControl = isAdminPreview ? FILE_CACHE_CONTROL.PRIVATE : FILE_CACHE_CONTROL.PUBLIC;
