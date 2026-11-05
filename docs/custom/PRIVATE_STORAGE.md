@@ -4,7 +4,7 @@ Cloudreve 只填写 ImageBed 地址、API Token 和专用目录。实际存储�
 
 ## 沿用现有 Telegram
 
-保留现有 Bot 和存储频道。私密上传使用启用的默认 Telegram 渠道，通过 getChat 确认目标没有公开用户名；公开频道会被拒绝。频道成员仍可在 Telegram 查看文件，应控制成员范围。
+保留现有 Bot 和存储频道。私密上传使用启用的默认 Telegram 渠道，通过 getChat 拒绝带公开用户名的频道/超级群；个人私聊不因对方有用户名而被拒绝。频道成员仍可在 Telegram 查看文件，应控制成员范围。
 
 私密文件按原始 document 上传，不压缩图片、不转换动画、不发送内容审核。超过 16 MiB 时由 ImageBed 内部分片；Cloudreve 仍只上传一次。首轮 Cloudreve 单文件上限为 100 MiB。
 
