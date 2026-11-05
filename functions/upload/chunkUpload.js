@@ -6,6 +6,7 @@ import { DiscordAPI } from '../utils/storage/discordAPI';
 import { CreateMultipartUploadCommand, UploadPartCommand, AbortMultipartUploadCommand } from "@aws-sdk/client-s3";
 import { getDatabase, checkDatabaseConfig } from '../utils/databaseAdapter.js';
 import { fetchPageConfig } from '../utils/sysConfig.js';
+import { uploadAccessResponse } from './privateUpload.js';
 
 // 初始化分块上传
 export async function initializeChunkedUpload(context) {
@@ -1225,6 +1226,9 @@ export async function uploadLargeFileToTelegram(context, file, fullId, metadata,
             if (!chunkInfo.file_id || !chunkInfo.file_size) {
                 throw new Error(`Invalid chunk info for chunk ${i + 1}/${totalChunks}`);
             }
+            if (context.privateUpload && chunkInfo.file_size !== chunkBlob.size) {
+                throw new Error('Private Telegram chunk size mismatch');
+            }
 
             chunks.push({
                 index: i,
@@ -1267,8 +1271,8 @@ export async function uploadLargeFileToTelegram(context, file, fullId, metadata,
         const pageConfig = await fetchPageConfig(env);
         const urlPrefixConfig = pageConfig.config?.find(c => c.id === 'urlPrefix');
         const urlPrefix = urlPrefixConfig?.value || '';
-        const responseBody = [{ 'src': returnLink }];
-        if (urlPrefix) {
+        const responseBody = [{ 'src': returnLink, ...uploadAccessResponse(context) }];
+        if (urlPrefix && !context.privateUpload) {
             responseBody[0].publicUrl = `${urlPrefix.replace(/\/+$/, '')}/${fullId}`;
         }
 

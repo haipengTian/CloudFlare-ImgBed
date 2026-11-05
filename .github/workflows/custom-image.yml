@@ -99,8 +99,9 @@ jobs:
           docker cp tools/custom/tests/readiness.mjs imgbed-smoke:/app/tools/custom/tests/readiness.mjs
           docker cp tools/custom/tests/private-upload.mjs imgbed-smoke:/app/tools/custom/tests/private-upload.mjs
           docker cp tools/custom/tests/private-storage-handler.mjs imgbed-smoke:/app/tools/custom/tests/private-storage-handler.mjs
+          docker cp tools/custom/tests/private-telegram.mjs imgbed-smoke:/app/tools/custom/tests/private-telegram.mjs
           docker exec imgbed-smoke node --import ./deploy/server/register.mjs --test tools/custom/tests/readiness.mjs
-          docker exec imgbed-smoke node --import ./deploy/server/register.mjs --test tools/custom/tests/private-upload.mjs tools/custom/tests/private-storage-handler.mjs
+          docker exec imgbed-smoke node --import ./deploy/server/register.mjs --test tools/custom/tests/private-upload.mjs tools/custom/tests/private-storage-handler.mjs tools/custom/tests/private-telegram.mjs
           docker exec imgbed-smoke node --import ./deploy/server/register.mjs deploy/server/readiness.js
           node tools/custom/tests/smoke.mjs "http://127.0.0.1:$port" "$scratch/file.json"
           echo "Before restart: host port $port"

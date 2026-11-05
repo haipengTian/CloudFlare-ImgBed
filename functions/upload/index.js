@@ -301,7 +301,7 @@ async function processFileUpload(context, formdata = null) {
 // 构建上传成功响应，自动附带 publicUrl（如果已配置）
 function buildUploadResponse(context, returnLink) {
     const result = { src: returnLink, ...uploadAccessResponse(context) };
-    if (context.publicUrl) {
+    if (context.publicUrl && !context.privateUpload) {
         result.publicUrl = context.publicUrl;
     }
     return createResponse(JSON.stringify([result]), {
@@ -493,11 +493,11 @@ async function uploadFileToTelegram(context, fullId, metadata, fileExt, fileName
     }
 
     // 由于TG会把gif后缀的文件转为视频，所以需要修改后缀名绕过限制
-    if (fileExt === 'gif') {
+    if (!context.privateUpload && fileExt === 'gif') {
         const newFileName = fileName.replace(/\.gif$/, '.jpeg');
         const newFile = new File([formdata.get('file')], newFileName, { type: fileType });
         formdata.set('file', newFile);
-    } else if (fileExt === 'webp') {
+    } else if (!context.privateUpload && fileExt === 'webp') {
         const newFileName = fileName.replace(/\.webp$/, '.jpeg');
         const newFile = new File([formdata.get('file')], newFileName, { type: fileType });
         formdata.set('file', newFile);
@@ -525,7 +525,7 @@ async function uploadFileToTelegram(context, fullId, metadata, fileExt, fileName
     }
 
     // 根据服务端压缩设置处理接口：从参数中获取serverCompress，如果为false，则使用sendDocument接口
-    if (url.searchParams.get('serverCompress') === 'false') {
+    if (context.privateUpload || url.searchParams.get('serverCompress') === 'false') {
         sendFunction = { 'url': 'sendDocument', 'type': 'document' };
     }
 
@@ -534,7 +534,10 @@ async function uploadFileToTelegram(context, fullId, metadata, fileExt, fileName
     try {
         const response = await telegramAPI.sendFile(formdata.get('file'), tgChatId, sendFunction.url, sendFunction.type);
         const fileInfo = telegramAPI.getFileInfo(response);
-        const filePath = await telegramAPI.getFilePath(fileInfo.file_id);
+        if (context.privateUpload && (!fileInfo || fileInfo.file_size !== fileSize)) {
+            throw new Error('Private Telegram document size mismatch');
+        }
+        const filePath = context.privateUpload ? '' : await telegramAPI.getFilePath(fileInfo.file_id);
         const id = fileInfo.file_id;
         // 更新FileSize
         metadata.FileSize = (fileInfo.file_size / 1024 / 1024).toFixed(2);
@@ -546,7 +549,7 @@ async function uploadFileToTelegram(context, fullId, metadata, fileExt, fileName
         // 图像审查（使用代理域名或官方域名）
         const moderateDomain = tgProxyUrl ? `https://${tgProxyUrl}` : 'https://api.telegram.org';
         const moderateUrl = `${moderateDomain}/file/bot${tgBotToken}/${filePath}`;
-        metadata.Label = await moderateContent(env, moderateUrl);
+        metadata.Label = context.privateUpload ? 'None' : await moderateContent(env, moderateUrl);
 
         // 更新metadata，写入KV数据库
         try {
