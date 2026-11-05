@@ -31,7 +31,8 @@ export async function resolvePrivateChannel(context) {
         // A public chat would publish the document outside the authenticated API.
         try {
             const chat = await new TelegramAPI(channel.botToken, channel.proxyUrl || '').getChat(channel.chatId);
-            if (!chat || !['private', 'group', 'supergroup', 'channel'].includes(chat.type) || chat.username || chat.active_usernames?.length) {
+            const publicChat = ['channel', 'supergroup'].includes(chat?.type) && (chat.username || chat.active_usernames?.length);
+            if (!chat || !['private', 'group', 'supergroup', 'channel'].includes(chat.type) || publicChat) {
                 return new Response('Private storage requires a non-public Telegram chat', { status: 403 });
             }
         } catch {

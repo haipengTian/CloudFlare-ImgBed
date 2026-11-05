@@ -83,4 +83,8 @@ test('server-side routing honors configured defaults and never silently changes 
     assert.equal((await preparePrivateUpload(broken, async () => true)).status, 503);
     chat = { type: 'channel', username: 'public-channel' };
     assert.equal((await preparePrivateUpload(context(), async () => true)).status, 403);
+    chat = { type: 'supergroup', active_usernames: ['public-group'] };
+    assert.equal((await preparePrivateUpload(context(), async () => true)).status, 403);
+    chat = { type: 'private', username: 'private-user' };
+    assert.equal(await preparePrivateUpload(context(), async () => true), null, 'a user handle does not make a private chat public');
 });
