@@ -2,6 +2,12 @@
  * Telegram API 封装类
  */
 export class TelegramAPI {
+    async getChat(chatId) {
+        const response = await fetch(`${this.baseURL}/getChat?chat_id=${encodeURIComponent(chatId)}`, { headers: this.defaultHeaders });
+        const data = await response.json();
+        return response.ok && data.ok ? data.result : null;
+    }
+
     constructor(botToken, proxyUrl = '') {
         this.botToken = botToken;
         this.proxyUrl = proxyUrl;

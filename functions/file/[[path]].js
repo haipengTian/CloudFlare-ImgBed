@@ -13,6 +13,7 @@ import { getDatabase } from '../utils/databaseAdapter.js';
 import { authenticate, AUTH_SCOPE } from '../utils/auth/authCore.js';
 import { validateApiToken } from '../utils/auth/tokenValidator.js';
 import { validateSession } from '../utils/auth/sessionManager.js';
+import { privateTelegramFile } from './privateTelegramFile.js';
 import {
     resolveDiscordCredentials,
     resolveHuggingFaceCredentials,
@@ -114,6 +115,10 @@ async function serveFile(context) {  // Contents of context object
     }
     if (imgRecord.metadata.Access === 'private') {
         context.privateStorageUploadId = imgRecord.metadata.StorageUploadId;
+    }
+
+    if (imgRecord.metadata.Access === 'private' && imgRecord.metadata.Channel === 'TelegramNew') {
+        return privateTelegramFile(context, imgRecord, encodedFileName, fileType);
     }
 
     const imageSourceValidation = validateImageTransformSource(context.imageTransform, env, fileType, fileName);

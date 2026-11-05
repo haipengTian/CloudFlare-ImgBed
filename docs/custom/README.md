@@ -103,4 +103,4 @@ GHCR 页面显示 Public，匿名 registry 请求确认镜像可读取。
 每项功能从已融合且可交付的个人 main 建立 `codex/feature-名称`，先写行为测试，再实现并记录回归。
 优先保留官方接口与配置结构，把功能改动按独立提交管理，避免混入无关格式整理。
 审查、验证、合入后沿用同一套个人版本发布与运维升级流程。
-Cloudreve 存储适配新增可选[私密存储接口 v1](PRIVATE_STORAGE.md)：默认关闭，普通公开上传保持原行为。服务器显式允许非公开渠道后，Cloudreve 才能在独占目录进行私密上传、鉴权读取及幂等重试；首轮限定 `cloudreve-test/`。配套运维步骤见 `server-ops/imgbed/PRIVATE_STORAGE_UPGRADE.md`。
+Cloudreve 通过[统一私密存储接口](PRIVATE_STORAGE.md)连接 ImageBed，仅配置地址、Token 和目录；底层渠道沿用 ImageBed 默认设置。Telegram 私密目标无需额外环境变量，R2/S3 仍需显式许可。普通公开上传保持原行为；首轮限定 `cloudreve-test/`。升级步骤见 `server-ops/imgbed/PRIVATE_STORAGE_UPGRADE.md`。
